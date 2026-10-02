@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Data gambar (144 MB, hasil split dari video)
+data/raw/
+data/train/
+data/val/
+data/test/
+
+# Bobot model & hasil training (271 MB)
+outputs/
+src/outputs/
+*.pt
+*.pth
+
+# OS
+.DS_Store

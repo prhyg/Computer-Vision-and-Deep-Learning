@@ -1,6 +1,7 @@
-# Transfer Learning — ResNet18
+# Transfer Learning — ResNet50
 
-Fine-tune ResNet18 pretrained ImageNet untuk klasifikasi citra memakai PyTorch.
+Fine-tune ResNet50 pretrained ImageNet untuk klasifikasi citra memakai PyTorch.
+Backbone bisa diturunkan ke `--arch resnet18` kalau perlu model yang lebih ringan.
 
 ## Eksperimen 3 mode
 
@@ -56,7 +57,7 @@ data/
   metadata.csv          # class, image, split, frame_index, seconds
 src/
   dataset.py   # ImageFolder + augmentasi
-  model.py     # ResNet18 + head baru
+  model.py     # ResNet50 (atau resnet18) + head baru
   train.py     # loop training
   predict.py   # inferensi
 outputs/
@@ -81,9 +82,10 @@ Opsi berguna:
 
 | Flag | Arti |
 |---|---|
+| `--arch resnet18` | ganti backbone, default `resnet50` |
 | `--freeze-backbone` | deprecated, pakai `--mode feature` |
 | `--mode feature` | hanya `fc` yang dilatih (1.026 param) |
-| `--mode partial` | `layer4` + `fc` dilatih, stem beku (75% param) |
+| `--mode partial` | `layer4` + `fc` dilatih, stem beku (~64% param) |
 | `--mode scratch` | semua layer, bobot pretrained dibuang (100% param) |
 | `--layer4-lr-mult 0.5` | LR dikali ini untuk layer4 |
 | `--fc-lr-mult 1.0` | LR dikali ini untuk head |
@@ -108,7 +110,7 @@ python predict.py --checkpoint ../outputs/best.pt ../data/test
 
 - Rasio split yang umum: train 70%, val 15%, test 15%.
 - Setiap kelas wajib ada di train dan val, kalau tidak script berhenti dengan pesan error.
-- Kalau dataset kecil (<2000 gambar), mulai dari `--epochs 10 --lr 1e-4 --dropout 0.2`.
+- Kalau dataset kecil (<2000 gambar), mulai dari `--epochs 10 --lr 1e-4 --dropout 0.2 --arch resnet18`.
 - Kalau dataset besar, `--lr 3e-4 --batch-size 64` dan `--amp` membantu.
 - `outputs/history.json` berisi akurasi per epoch untuk lihat overfitting.
 - `outputs/curves.png` menampilkan kurva train vs val (loss, accuracy, learning rate) otomatis setiap training selesai.
