@@ -1,20 +1,30 @@
-# Python
-__pycache__/
-*.py[cod]
+# virtualenv
 .venv/
 venv/
+env/
 
-# Data gambar (144 MB, hasil split dari video)
-data/raw/
-data/train/
-data/val/
-data/test/
-
-# Bobot model & hasil training (271 MB)
-outputs/
-src/outputs/
+# bobot model: besar (43-90 MB per file) dan bisa dibangun ulang dengan training
 *.pt
 *.pth
+*.onnx
 
-# OS
+# dataset INI ikut di-commit, supaya repo bisa langsung dipakai tanpa perlu
+# menyalin gambar lagi. 83 MB di disk: data/raw/ dan data/{train,val,test}/ berisi
+# file yang sama (hardlink), jadi git menyimpannya satu kali saja lewat hash.
+# Kalau datasetnya dirahasiakan, hapus blok ini dan taruh .gitignore terpisah
+# untuk foldernya.
+# data/
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# OS / editor
 .DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/

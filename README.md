@@ -1,116 +1,153 @@
-# Transfer Learning — ResNet50
+# Klasifikasi Kotak dan Sampah — Transfer Learning
 
-Fine-tune ResNet50 pretrained ImageNet untuk klasifikasi citra memakai PyTorch.
-Backbone bisa diturunkan ke `--arch resnet18` kalau perlu model yang lebih ringan.
+Klasifikasi citra 3 kelas (`box_cokelat`, `box_merah`, `trash`) dengan PyTorch.
+Dua eksperimen terpisah, masing-masing di foldernya sendiri:
 
-## Eksperimen 3 mode
+| Folder | Backbone | Mode | Output |
+|---|---|---|---|
+| [`resnet18_3mode/`](resnet18_3mode/) | ResNet18 | 3 mode: `feature`, `partial`, `scratch` | perbandingan + checkpoint tiap mode |
+| [`resnet50_1mode/`](resnet50_1mode/) | ResNet50 | 1 mode: `feature` | checkpoint tunggal |
 
-Bandingkan `feature` vs `partial` vs `scratch` dengan data, seed, dan
-hyperparameter yang sama:
+Keduanya memakai **dataset yang sama persis** (`data/`) dengan seed dan
+hyperparameter yang sama, jadi hasil dua folder bisa dibandingkan langsung.
+Tiap folder mandiri: `dataset.py` dan `model.py` di dalamnya adalah salinan,
+tidak saling mengimpor.
 
-```bash
-cd src
-python compare.py --data ../data --epochs 20 --patience 6
-```
-
-Output: `outputs/compare.json`, `outputs/results.md` (tabel markdown),
-`outputs/compare_modes.png` (loss + akurasi per epoch), 
-`outputs/compare_convergence.png`, dan `best_<mode>.pt` per mode.
-
-Learning rate default per mode (`DEFAULT_LR` di `compare.py`):
-`feature 3e-4`, `partial 3e-4`, `scratch 1e-2`. Mode scratch butuh LR jauh
-lebih besar karena bobotnya acak, bukan fitur pretrained.
-
-## Menyusun dataset
+## Mulai cepat
 
 ```bash
-python split.py --data ../data --keep-src
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+
+# ResNet18, bandingkan 3 mode
+python resnet18_3mode/compare.py --epochs 20 --patience 5
+
+# ResNet50, mode feature
+python resnet50_1mode/train.py --epochs 20 --batch-size 32 --amp
+
+# Grafik perbandingan kedua model
+python compare_models.py
 ```
 
-Split dilakukan per blok waktu berurutan, bukan acak. Frame berasal dari video
-yang sama, jadi split acak membuat frame train dan val nyaris identik dan
-val_acc jadi tidak bermakna. Flag penting: `--ratios 0.7 0.15 0.15`, `--block 5`,
-`--keep-src` (folder sumber tidak dihapus), `--copy`, `--link` (symlink).
-
-## Metadata dataset
-
-`data/metadata.csv` mencatat setiap gambar: `class`, `image`, `split`,
-`frame_index`, `seconds`. `frame_index` penting karena berasal dari video yang
-sama — dipakai untuk memastikan split tidak memisahkan frame bersebelahan.
-
-Kalau `data/raw/` atau `metadata.csv` hilang, bangun ulang dari file hasil
-split (nama file masih menyimpan frame index aslinya):
-
-```bash
-python build_metadata.py --data ../data          # hardlink, tidak duplikat disk
-python build_metadata.py --data ../data --force  # tulis ulang
-```
+Path `--data` dan `--out` sudah relatif ke masing-masing file, jadi script bisa
+dijalankan dari root repo atau dari dalam foldernya tanpa adjust.
 
 ## Struktur
 
 ```
 data/
-  raw/<kelas>/*.jpg     # Master, tidak ikut training
-  train/<kelas>/*.jpg
-  val/<kelas>/*.jpg
-  test/<kelas>/*.jpg
-  metadata.csv          # class, image, split, frame_index, seconds
-src/
-  dataset.py   # ImageFolder + augmentasi
-  model.py     # ResNet50 (atau resnet18) + head baru
-  train.py     # loop training
-  predict.py   # inferensi
-outputs/
-  best.pt last.pt history.json curves.png
+  raw/<kelas>/*.jpg     # master, tidak ikut training
+  train/<kelas>/*.jpg   # 232 gambar (70 + 70 + 92)
+  val/<kelas>/*.jpg     # 50 gambar  (15 + 15 + 20)
+  test/<kelas>/*.jpg    # 50 gambar  (15 + 15 + 20)
+  metadata.csv          # class, image, split, frame_index, seconds (332 baris)
+resnet18_3mode/
+  dataset.py model.py compare.py predict.py
+  outputs/              # best_<mode>.pt, compare.json, results.md, grafik
+resnet50_1mode/
+  dataset.py model.py train.py predict.py
+  outputs/              # best_feature.pt, last_feature.pt, history, kurva
+prepare/
+  split.py              # menyusun train/val/test dari data/raw
+  build_metadata.py     # bangun ulang metadata.csv
+compare_models.py       # grafik perbandingan ResNet18 vs ResNet50
+outputs/                # compare_models.png, compare_models.md
 ```
 
-## Setup
+## Menyusun dataset
+
+Sumber kelas dibaca dari `data/raw/`, hasilnya ditulis ke `data/{train,val,test}/`.
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+python prepare/split.py --data data --keep-src
 ```
 
-## Training
+Split dilakukan per blok waktu berurutan, bukan acak. Frame berasal dari video
+yang sama, jadi split acak membuat frame train dan val nyaris identik dan
+`val_acc` jadi tidak bermakna. Flag penting: `--ratios 0.7 0.15 0.15`, `--block 5`,
+`--keep-src` (folder sumber tidak dihapus), `--copy`, `--link` (symlink).
+
+Menambah kelas baru? Pakai `--classes` supaya split kelas yang sudah ada tidak
+diacak ulang:
 
 ```bash
-cd src
-python train.py --data ../data --epochs 20 --batch-size 32 --amp
+python prepare/split.py --data data --classes trash --keep-src
+python prepare/build_metadata.py --data data --force
 ```
 
-Opsi berguna:
+`--force` di `build_metadata.py` wajib dipakai kalau `data/raw/` sudah berisi
+file untuk kelas itu. Tanpa itu file yang sudah ada dilewati dan kelas barunya
+tidak masuk ke `metadata.csv`.
 
-| Flag | Arti |
-|---|---|
-| `--arch resnet18` | ganti backbone, default `resnet50` |
-| `--freeze-backbone` | deprecated, pakai `--mode feature` |
-| `--mode feature` | hanya `fc` yang dilatih (1.026 param) |
-| `--mode partial` | `layer4` + `fc` dilatih, stem beku (~64% param) |
-| `--mode scratch` | semua layer, bobot pretrained dibuang (100% param) |
-| `--layer4-lr-mult 0.5` | LR dikali ini untuk layer4 |
-| `--fc-lr-mult 1.0` | LR dikali ini untuk head |
-| `--tag Nama` | suffix file output, mis. `best_Nama.pt` |
-| `--patience 5` | early stop |
-| `--resume outputs/last.pt` | lanjutkan training |
-| `--dropout 0.2` | regularisasi head |
-| `--device cpu` | paksa CPU |
-| `--no-plot` | jangan buat grafik |
-| `--plot-only ../outputs/history.json` | buat grafik dari history lama, tanpa training |
+`data/metadata.csv` mencatat setiap gambar: `class`, `image`, `split`,
+`frame_index`, `seconds`. `frame_index` penting karena berasal dari video yang
+sama — dipakai untuk memastikan split tidak memisahkan frame bersebelahan.
 
-Perhatikan: `cd src` dulu karena `train.py` mengimpor modul di foldernya sendiri.
-
-## Prediksi
+Kalau `data/raw/` atau `metadata.csv` hilang, bangun ulang dari file hasil split
+(nama file masih menyimpan frame index aslinya):
 
 ```bash
-cd src
-python predict.py --checkpoint ../outputs/best.pt ../data/test
+python prepare/build_metadata.py --data data          # hardlink, tidak duplikat disk
+python prepare/build_metadata.py --data data --force  # tulis ulang
 ```
+
+## Grafik perbandingan ResNet18 vs ResNet50
+
+`compare_models.py` di root membaca output training kedua folder lalu menggambar
+perbandingannya. Script ini tidak training apa pun — jalankan training dulu,
+lalu plotting:
+
+```bash
+python resnet18_3mode/compare.py --epochs 20 --patience 20   # 3 mode
+python resnet50_1mode/train.py  --epochs 20 --patience 20     # 1 mode
+python compare_models.py
+```
+
+Output: `outputs/compare_models.png` dan `outputs/compare_models.md`.
+
+Isi grafik 4 panel: val accuracy per epoch, validation loss per epoch (log),
+durasi per epoch, dan loss akhir + jumlah parameter. Mode `partial`/`scratch`
+ResNet18 digambar sebagai garis konteks (`--no-context` untuk disembunyikan).
+
+Yang dibandingkan adalah **feature vs feature** — mode sama di kedua sisi, jadi
+selisihnya murni pengaruh arsitektur.
+
+### Hasil (seed 42, 20 epoch, CPU)
+
+| model | param | param dilatih | val_acc | test_acc | val_loss | test_loss | detik/epoch |
+|---|---|---|---|---|---|---|---|
+| ResNet18 feature | 11,2M | 1,5k | 1.0000 | 1.0000 | 0.1515 | 0.4842 | 16.1 |
+| ResNet50 feature | 23,6M | 6,1k | 1.0000 | 1.0000 | 0.1836 | 0.5382 | 28.4 |
+
+Konteks ResNet18: `partial` val_loss 0.0062, `scratch` 0.0001.
+
+**Akurasi tidak dipakai jadi pembanding utama** karena semua konfigurasi mentok
+di 1.0000. Pembeda yang nyata hanya loss dan kecepatan: ResNet18 hampir 2× lebih
+cepat dengan parameterseparuh lebih sedikit, dan loss-nya justru lebih rendah.
+
+Waktu per epoch di sini diukur di CPU. Di GPU angkanya berbeda dan ResNet50 akan
+jauh lebih lambat karena jumlah layer dan channel-nya lebih banyak.
+
+## Catatan eksperimen
+
+- `feature`/`partial`/ResNet50 pakai bobot pretrained, jadi LR kecil wajar.
+  `scratch` membuang bobot itu sehingga butuh LR jauh lebih besar (`1e-2`).
+- Head `feature` cuma ~1.539–6.147 parameter. Di dataset 332 gambar itu sudah
+  cukup untuk mencapai akurasi tinggi, tapi tidak generalisasi ke kelas atau
+  kondisi baru — pakai `partial` kalau butuh model yang lebih kuat.
+- Ketiga kelas tidak seimbang sumbernya. `box_cokelat` dan `box_merah` diambil
+  dari video panjang dengan frame di-skip (100 gambar dari ribuan frame),
+  sedangkan `trash` 132 gambar berurutan dari klip pendek. Artinya kelas `trash`
+  punya variasi visual lebih sedikit dan lebih rawan overfitting, jadi
+  `val_acc`/`test_acc` yang tinggi belum tentu berarti model generalize bagus.
+- Split per blok waktu membuat `val` dan `test` berisi frame dari segmen video
+  yang berbeda, jadi angkanya lebih jujur daripada split acak.
+- `--amp` hanya speeding di CUDA; di CPU tidak berpengaruh.
+- `history_*.json` berisi akurasi per epoch untuk melihat overfitting;
+  `curves_*.png` / `compare_*.png` dibuat otomatis setiap training selesai.
 
 ## Tips
 
+- Kalau dataset kecil (<2000 gambar), mulai dari `--epochs 10 --dropout 0.2`.
 - Rasio split yang umum: train 70%, val 15%, test 15%.
 - Setiap kelas wajib ada di train dan val, kalau tidak script berhenti dengan pesan error.
-- Kalau dataset kecil (<2000 gambar), mulai dari `--epochs 10 --lr 1e-4 --dropout 0.2 --arch resnet18`.
-- Kalau dataset besar, `--lr 3e-4 --batch-size 64` dan `--amp` membantu.
-- `outputs/history.json` berisi akurasi per epoch untuk lihat overfitting.
-- `outputs/curves.png` menampilkan kurva train vs val (loss, accuracy, learning rate) otomatis setiap training selesai.
