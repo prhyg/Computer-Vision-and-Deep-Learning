@@ -1,0 +1,3 @@
+box_cokelat
+box_merah
+trash

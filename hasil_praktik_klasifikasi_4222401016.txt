@@ -1,0 +1,17 @@
+==============================================================================
+  PRAKTIK TERPADU MINGGU 4-7 - KLASIFIKASI
+==============================================================================
+  NIM / Nama    : 4222401016 / Prhayogo
+  Waktu         : 16-10-2026 18:41:59
+  Komputer/user : prhayogo-ASUS-TUF-Gaming-A15-FA506NFR-FA506NFR / prhayogo
+  Dataset       : /home/prhayogo/Documents/transfer_learning/data
+  Pengaturan    : model yolo26n-cls, epochs 20, imgsz 224, batch 32
+==============================================================================
+  Eksperimen     Perubahan         top1    top5  val_loss     ms   menit
+  E1_pretrained  -                1.000   1.000    0.0001    2.0     1.6
+  E2_scratch     -                1.000   1.000    0.0017    1.7     1.6
+  E3_tuning      imgsz=288        1.000   1.000    0.0002    3.1     2.5
+==============================================================================
+  Model terpilih (top1 val tertinggi): E1_pretrained
+  Hasil di data TEST (sekali saja)    : top1 1.000 | top5 1.000
+==============================================================================
