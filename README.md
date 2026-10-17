@@ -52,6 +52,8 @@ prepare/
   build_metadata.py     # bangun ulang metadata.csv
 compare_models.py       # grafik perbandingan ResNet18 vs ResNet50
 outputs/                # compare_models.png, compare_models.md
+hasil_praktik_klasifikasi/
+  E1_pretrained/ E2_scratch/ E3_tuning/   # args.yaml, results.csv, confusion matrix, weights/best.pt
 ```
 
 ## Menyusun dataset
@@ -127,6 +129,48 @@ cepat dengan parameterseparuh lebih sedikit, dan loss-nya justru lebih rendah.
 
 Waktu per epoch di sini diukur di CPU. Di GPU angkanya berbeda dan ResNet50 akan
 jauh lebih lambat karena jumlah layer dan channel-nya lebih banyak.
+
+## Praktik terpadu — klasifikasi YOLO (`yolo26n-cls`)
+
+Script `YOLO/YOLO/06_latih_bandingkan_klasifikasi.py` menjalankan 3 eksperimen
+sekaligus pada dataset yang sama (20 epoch, batch 32, `imgsz` 224 kecuali E3):
+E1 pretrained, E2 scratch, E3 tuning `imgsz=288`. Ketiganya diuji di data
+**test** satu kali setelah model terpilih.
+
+### Hasil test
+
+| Eksperimen | top1 | top5 |
+|---|---|---|
+| E1_pretrained (terpilih) | 1.000 | 1.000 |
+| E2_scratch | 1.000 | 1.000 |
+| E3_tuning | 1.000 | 1.000 |
+
+Rincian val (untuk memilih model, bukan hasil test): E1 val_loss 0.0001,
+E2 0.0017, E3 0.0002 — semua top1 mentok, jadi yang dipilih dari `val_loss`
+terkecil, yaitu E1. Angka lengkap: `hasil_praktik_klasifikasi_4222401016.txt`
+dan `.csv`; grafik, confusion matrix, dan bobot `best.pt` tiap eksperimen ada di
+[`hasil_praktik_klasifikasi/`](hasil_praktik_klasifikasi/).
+
+Top1 mentok di 1.000 karena dataset cuma 332 gambar dari video yang sama, jadi
+selisih antar konfigurasi cuma terlihat di `val_loss` dan kecepatan (E3 `imgsz`
+288 justru ~1.5× lebih lambat tanpa perbaikan).
+
+### Menjalankan training
+
+```bash
+pip install ultralytics
+
+# siapkan split data/{train,val,test} dulu (kalau belum ada)
+python prepare/split.py --data data --keep-src
+
+# jalankan 3 eksperimen + evaluasi test, tulis hasil ke hasil_praktik_klasifikasi/
+python YOLO/YOLO/06_latih_bandingkan_klasifikasi.py \
+  --nim 4222401016 --nama "Prhayogo" \
+  --model yolo26n-cls --epochs 20 --imgsz 224 --batch 32 --device cpu
+```
+
+Opsi: `--device 0` untuk GPU, `--device cpu` untuk CPU (default otomatis),
+`--ubah epochs=60` untuk mengganti setelan E3 (harus format `kunci=nilai`).
 
 ## Catatan eksperimen
 
